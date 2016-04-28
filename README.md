@@ -1,6 +1,8 @@
 这是一个简单的node爬虫，index为程序入口
 
-主要的爬虫模块在modules/crawler.js中
+主要的爬虫模块在modules/crawler.js中。
+
+相关博客:[http://www.cnblogs.com/LandMine/p/5443166.html](http://www.cnblogs.com/LandMine/p/5443166.html)
 
 具体使用方法可以在index中看到一个例子。
 
@@ -18,15 +20,16 @@ var opt = {
         console.log(html);
     },
     filterUrl:function(url){
-    	if( url.indexOf("http") == -1 ) return false;
+    	//如果url不是www.example.com网站下的，则舍弃
+        if( url.indexOf("www.example.com") == -1 ) return false;
+        //否则保留
         return true;
     },
-    deepCount:4,
+    deepCount:5,
     firstUrl:"http://www.example.com"
 };
 
 var c = new Crawler(opt);
-
 c.crawl();
 ```
 

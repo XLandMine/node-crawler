@@ -67,16 +67,6 @@ Crawler.filterUrl = function( url , c){
     //调用对象自定义的filterUrl方法
     return c.filterUrl(url);
 }
-//获得url目录深度
-Crawler.getDeep = function(url){
-    var uObj = urlUtil.parse(url);
-    var deep = 0;
-    //只保留path的 / 字符串
-    if (uObj.path) {
-        deep = uObj.path.replace(/[^//]/g,"").length;
-    }
-    return deep;
-}
 
 //开始爬取队列中的url
 Crawler.prototype.crawl = function(){

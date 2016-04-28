@@ -6,11 +6,13 @@ var urlUtil = require("url");
 //获得a标签的链接
 var urlReg = /<a.*?href=['"]([^"']*)['"][^>]*>/gmi;
 
-
+//将要抓取的url队列
 var newUrlQueen = [];
 
+//已经抓取完毕的url队列
 var oldUrlQueen = [];
 
+//几率抓取结果
 var crawlCount = {
     total:0,
     success:0,
@@ -40,6 +42,7 @@ Crawler.parseUrl = function(html){
     var urlArr = [];
     var m = null;
     while( m = urlReg.exec(html) ){
+        //利用正则将解析到的url保存到数组
         urlArr.push(m[1]);
     }
     return urlArr;
@@ -52,15 +55,16 @@ Crawler.filterUrl = function( url , c){
     if (oldUrlQueen.indexOf( url ) > -1 || newUrlQueen.indexOf( url ) > -1) { return false};
     
     uObj = urlUtil.parse(url);
+
     //判断是否是锚链接
     if (uObj.hash) { return false};
-    //只保留path的 / 字符串
     if (uObj.path) {
+        //只保留path的 / 字符串
         deep = uObj.path.replace(/[^//]/g,"").length;
         //判断是否超过设定的页面深度
         if ( deep >= c.deepCount ) { return false };
     }
-    //调用对象的filterUrl方法
+    //调用对象自定义的filterUrl方法
     return c.filterUrl(url);
 }
 //获得url目录深度
@@ -77,8 +81,11 @@ Crawler.getDeep = function(url){
 //开始爬取队列中的url
 Crawler.prototype.crawl = function(){
     if (newUrlQueen.length > 0) {
+        //从队列中取出要爬取的url
         var url = newUrlQueen.shift();
+        //填入爬取过的url
         oldUrlQueen.push(url);
+        //开始爬取
         this.senReq(url)
     }else {
         console.log("抓取结束，此次抓取统计：");
@@ -90,9 +97,9 @@ Crawler.prototype.crawl = function(){
 Crawler.prototype.senReq = function(url){
     var req = '';
     var oOptions = urlUtil.parse(url);
-        oOptions.headers = {
-            "User-Agent":"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.152 Safari/537.36",
-        };
+    oOptions.headers = {
+        "User-Agent":"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.152 Safari/537.36",
+    };
     if(url.indexOf("https") > -1){
         req = https.request(oOptions);
     } else if (url.indexOf("http") > -1) {
@@ -111,7 +118,7 @@ Crawler.prototype.senReq = function(url){
             data += chunk;
         });
         res.on('end', function(){
-            //文本下载完成，进行处理
+            //html文本下载完成，进行处理
             self.handleSuccess(data,url);
             data = null;
         })

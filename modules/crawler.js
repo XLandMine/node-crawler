@@ -1,7 +1,8 @@
 var http = require("http");
 var https = require("https");
 var urlUtil = require("url");
-// var pathUtil = require("path");
+var events = require('events');
+var crawlEmitter = new events.EventEmitter();
 
 //获得a标签的链接
 var urlReg = /<a.*?href=['"]([^"']*)['"][^>]*>/gmi;
@@ -18,6 +19,47 @@ var crawlCount = {
     success:0,
     failure:0
 };
+
+//注册爬取事件
+crawlEmitter.on("crawl",function(c){
+    if (newUrlQueen.length > 0) {
+        //从队列中取出要爬取的url
+        var url = newUrlQueen.shift();
+        //填入爬取过的url
+        oldUrlQueen.push(url);
+        //开始爬取
+        c.senReq(url)
+    }else {
+        console.log("抓取结束，此次抓取统计：");
+        console.log(crawlCount);
+    }
+});
+
+//注册html下载成功事件
+crawlEmitter.on("success",function(c,url,data){
+    console.log("请求成功url：",url);
+    crawlCount.success++;
+    //解析页面所有url
+    var urlArr = Crawler.parseUrl(data);
+    urlArr.forEach(function(v){
+        //过滤不符合条件的url，符合条件的才会被加入待查询url队列
+        if ( Crawler.filterUrl( v , c ) ) { newUrlQueen.push(v) };
+    })
+
+    //解析页面所需要的数据
+    c.paresHtml(data);
+    //继续抓取
+    c.crawl();
+})
+
+//注册html下载出错事件
+crawlEmitter.on("error",function(c,url,err){
+    console.log("请求失败url:",url);
+    console.log("失败log：",err);
+    // console.log(err);
+    crawlCount.failure++;
+    c.crawl();
+})
 
 var Crawler = function (opt){
     //抓取深度
@@ -70,17 +112,8 @@ Crawler.filterUrl = function( url , c){
 
 //开始爬取队列中的url
 Crawler.prototype.crawl = function(){
-    if (newUrlQueen.length > 0) {
-        //从队列中取出要爬取的url
-        var url = newUrlQueen.shift();
-        //填入爬取过的url
-        oldUrlQueen.push(url);
-        //开始爬取
-        this.senReq(url)
-    }else {
-        console.log("抓取结束，此次抓取统计：");
-        console.log(crawlCount);
-    }
+    //触发crawl事件，将this当参数传入
+    crawlEmitter.emit("crawl",this);
 }
 
 //发送请求
@@ -95,9 +128,9 @@ Crawler.prototype.senReq = function(url){
     } else if (url.indexOf("http") > -1) {
         req = http.request(oOptions);
     } else {
-        //该url不是http或者https协议，放弃掉
+        //该url不是http或者https协议，放弃掉并开始下一次抓取
         this.crawl();
-        return ;
+        return;
     }
     var self = this;
     req.on("response",function(res){
@@ -109,13 +142,14 @@ Crawler.prototype.senReq = function(url){
         });
         res.on('end', function(){
             //html文本下载完成，进行处理
-            self.handleSuccess(data,url);
+            crawlEmitter.emit("success",self,url,data)
+
             data = null;
         })
     });
 
     req.on("error",function(err){
-        self.handleFailure(err,url);
+        crawlEmitter.emit("error",self,url,err)
     });
 
     req.on("finish",function(){
@@ -126,33 +160,5 @@ Crawler.prototype.senReq = function(url){
     req.end();
 }
 
-//请求成功
-Crawler.prototype.handleSuccess = function(data,url){
-    console.log("请求成功url：",url);
-    crawlCount.success++;
-
-    //解析页面所有url
-    var urlArr = Crawler.parseUrl(data);
-    var self = this;
-    urlArr.forEach(function(v){
-        //过滤不符合条件的url，符合条件的才会被加入待查询url队列
-        if ( Crawler.filterUrl( v , self ) ) { newUrlQueen.push(v) };
-    })
-
-    //解析页面所需要的数据
-    this.paresHtml(data);
-
-    //继续抓取
-    this.crawl();
-}
-
-//请求失败
-Crawler.prototype.handleFailure = function(err,url){
-    console.log("请求失败url:",url);
-    console.log("失败log：",err);
-    // console.log(err);
-    crawlCount.failure++;
-    this.crawl();
-}
 
 module.exports = Crawler;
